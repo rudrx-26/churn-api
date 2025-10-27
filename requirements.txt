@@ -5,3 +5,4 @@ scikit-learn
 tensorflow
 pickle-mixin
 sentry-sdk
+prometheus_client

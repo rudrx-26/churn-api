@@ -3,7 +3,12 @@ sentry_sdk.init(
     dsn="https://59779dcff8aafa598ede055ada86bcb1@o4510262460481536.ingest.us.sentry.io/4510262500589568",
     traces_sample_rate=1.0
 )
+from prometheus_client import start_http_server, Summary, Counter
 
+# Start Prometheus metrics on port 8000
+start_http_server(8000)
+PREDICTION_LATENCY = Summary('prediction_latency_seconds', 'Time spent predicting')
+PREDICTION_COUNT = Counter('prediction_total', 'Total number of predictions made')
 
 import streamlit as st
 import tensorflow as tf
@@ -36,7 +41,6 @@ with st.form("user_input_form"):
     submitted = st.form_submit_button("Predict")
 
 if submitted:
-    # Encode and scale features
     gender_encoded = le_gender.transform([gender])[0]
     num_features = np.array([[credit_score, age, tenure, balance, num_products, salary]])
     num_scaled = scaler.transform(num_features).flatten()
@@ -54,8 +58,12 @@ if submitted:
         geo_spain            # Geography_Spain (0/1)
     ]).reshape(1, -1)
 
-    prob = float(model.predict(input_data)[0][0])
+    @PREDICTION_LATENCY.time()
+    def predict_with_metrics(input_data):
+        prob = float(model.predict(input_data)[0][0])
+        PREDICTION_COUNT.inc()
+        return prob
+
+    prob = predict_with_metrics(input_data)
     pred = int(prob > 0.5)
     st.success(f"Churn prediction: **{'YES' if pred else 'NO'}** (Probability: {prob:.2f})")
-
-
